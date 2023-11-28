@@ -5,10 +5,12 @@
 This software allows you to create and display 3D holograms in the Minecraft. With this tool, you can enhance your Minecraft experience by adding fun and decorative holographic elements to your place.
 
 ## Features
+    What this project has to offer.
 - **Create Holograms:** Design and create 3D holograms using a popular Minecraft designing tool called blockbench!
 - **Settings:** In the client-side program there are some configurable values like render distance & etc.
 
 ## Getting Started
+    Everything you need to do to to get this thing working.
 1. **Download and Install:**
    - Download the "Client.lua" file from the Github repository here.
    - Alternatively use ```wget https://raw.githubusercontent.com/Darkodaaa/Hologramms/main/Client.lua```
@@ -21,6 +23,7 @@ This software allows you to create and display 3D holograms in the Minecraft. Wi
    - Run the program.
 
 ## Requirements
+    All the things you need for this to run. Both client-side and server-side.
    - **Client-side:**
         - A Neural interface
         - An Overlay glasses
