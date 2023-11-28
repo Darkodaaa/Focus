@@ -13,13 +13,13 @@ This software allows you to create and display 3D holograms in the Minecraft. Wi
     Everything you need to do to to get this thing working.
 1. **Download and Install:**
    - Download the "Client.lua" file from the Github repository here.
-   - Alternatively use ```wget https://raw.githubusercontent.com/Darkodaaa/Hologramms/main/Client.lua```
+   - Alternatively use ```wget https://raw.githubusercontent.com/Darkodaaa/Hologramms/main/Client.lua```.
 
 2. **Create a New Hologram:**
    - Place down a computer with a modem.
-   - Install "Display.lua" onto the computer.(You should probably rename it to startup.lua)
-   - Alternatively use ```wget https://raw.githubusercontent.com/Darkodaaa/Hologramms/main/Display.lua```
-   - Put your 3D print model called "Model.3dj"
+   - Install "Display.lua" onto the computer (You should probably rename it to startup.lua).
+   - Alternatively use ```wget https://raw.githubusercontent.com/Darkodaaa/Hologramms/main/Display.lua```.
+   - Put your 3D print model called "Model.3dj".
    - Run the program.
 
 ## Requirements
