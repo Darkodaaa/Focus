@@ -30,7 +30,7 @@ This software allows you to create and display 3D holograms in the Minecraft. Wi
         - A Wireless modem(The short range modem is usable too)
 
 ## Planned
-    More updates to software are on the way! These are features that are currently not done yet! They'll arrive shortly.
+    More updates to software are on the way! These are features that are currently not done yet!
    - **Animations:** You'll be able to animate these holograms hover you like.
    - **More file type to convert from:** Maybe I'll add the usage of file like 2dj or even blockbench json files.
    - **More client side options:** More options like custom overlays, scaling & etc.
