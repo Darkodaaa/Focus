@@ -21,7 +21,7 @@ local function Render()
         if hologram.dist < Config.RenderDist then
             for k,cube in pairs(hologram.body) do
                 local box = canvas.addBox(hologram.coords.x+cube.x-x, hologram.coords.y+cube.y-y, hologram.coords.z+cube.z-z, cube.w, cube.h, cube.d, cube.c)
-                box.setDepthTested(Config.Xray)
+                box.setDepthTested(not Config.Xray)
             end
         end
     end
@@ -47,9 +47,10 @@ end
 
 
 local function Relocate()
-    if not Config.AlwaysRecenter then return nil end
     while true do
-        x,y,z = gps.locate()
+        if Config.AlwaysRecenter then
+            x,y,z = gps.locate()
+        end
         os.sleep(2)
     end
 end
