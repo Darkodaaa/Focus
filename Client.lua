@@ -29,6 +29,7 @@ local function Render()
 end
 
 local function Main()
+    modem.transmit(holoport, holoport, "GetHolograms")
     while true do
         repeat
             event, side, channel, replyChannel, data, distance = os.pullEventRaw()

@@ -1,4 +1,4 @@
-# Holocast
+# HoloStream
 
 ## Overview
 
@@ -6,8 +6,8 @@ This software allows you to create and display 3D holograms in the Minecraft. Wi
 
 ## Features
     What this project has to offer.
-- **Create Holograms:** Design and create 3D holograms using a popular Minecraft designing tool called blockbench!
-- **Settings:** In the client-side program there are some configurable values like render distance & etc.
+   - **Create Holograms:** Design and create 3D holograms using a popular Minecraft designing tool called blockbench!
+   - **Settings:** In the client-side program there are some configurable values like render distance & etc.
 
 ## Getting Started
     Everything you need to do to to get this thing working.

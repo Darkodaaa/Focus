@@ -2,26 +2,21 @@ local modem = peripheral.wrap("back")
 
 local holoport = 65530
 modem.open(holoport)
+local args = {...}
+local modelfile = args[1] or "model.holo"
 
-
-local hologram = {
-    {x = 0, y = 1,z = 0, w = 1, h = 1, d = 1, c = 0x000000ff},
-    {x = 0, y = 11,z = 1, w = 1, h = 1, d = 1, c = 0xff0000ff},
-    {x = 0, y = 12,z = 0, w = 1, h = 1, d = 1, c = 0x00ff00ff},
-    {x = 1, y = 12,z = 3, w = 1, h = 1, d = 1, c = 0xf0ff00ff},
-    {x = 3, y = 12,z = 1, w = 1, h = 1, d = 1, c = 0xf0f0f0ff},
-    {x = 2, y = 12,z = 4, w = 1, h = 1, d = 1, c = 0xf00ff0ff},
-    {x = 0, y = 12,z = 2, w = 1, h = 1, d = 1, c = 0x0f0ff0ff},
-}
-
-local f = fs.open("Model.3dj","r")
-local model = f.readAll()
-f.close()
-
-if model then
-    local table = textutils.unserialiseJSON(model)
-    hologram = {}
-    for k,v in pairs(table.shapesOff) do
+local hologram = {}
+if modelfile:match(".holo") then
+    local f = fs.open(modelfile, "r")
+    hologram = textutils.unserialise(f.readAll())
+    f.close()
+elseif modelfile:match(".3dj") then
+    local f = fs.open(modelfile, "r")
+    local model = textutils.unserialiseJSON(f.readAll())
+    f.close()
+    assert(model,"Invalid model")
+    
+    for k,v in pairs(model.shapesOff) do
         hologram[k] = {
             x = v.bounds[1]/16,
             y = v.bounds[2]/16+1,
@@ -33,23 +28,35 @@ if model then
         }
     end
 else
-    local table = hologram
-    hologram = {}
-    for k,v in pairs(table) do
-        hologram[k] = {
-            x = v.bounds[1]/16,
-            y = v.bounds[2]/16+1,
-            z = v.bounds[3]/16,
-            w = (v.bounds[4]/16-v.bounds[1]/16),
-            h = (v.bounds[5]/16-v.bounds[2]/16),
-            d = (v.bounds[6]/16-v.bounds[3]/16),
-            c = tonumber("0x"..v.tint.."ff")
-        }
-    end
+    error("Invalid model extension")
 end
 
+
 local x,y,z = gps.locate(3)
-while true do
-    modem.transmit(holoport,holoport,{Protocol="HologramPing",Coords={x = x, y = y, z = z},hologram=hologram,id=os.getComputerID()})
-    os.sleep(5)
+if hologram.shapesOn then
+    parallel.waitForAny(function()
+        local signal = false
+        while true do
+            local lastsignal = signal
+            signal = rs.getInput("left") or rs.getInput("right") or rs.getInput("front") or rs.getInput("back") or rs.getInput("top") or rs.getInput("bottom")
+            if signal ~= lastsignal then
+                modem.transmit(holoport,holoport,{Protocol="HologramPing",Coords={x = x, y = y, z = z},hologram = signal and hologram.shapesOn or hologram.shapesOff,id=os.getComputerID()})
+            end
+            os.sleep(0)
+        end
+    end,
+    function()
+        while true do
+            local _, _, _, _, message = os.pullEvent("modem_message")
+            if message == "GetHolograms" then
+                modem.transmit(holoport,holoport,{Protocol="HologramPing",Coords={x = x, y = y, z = z},hologram=hologram.shapesOff,id=os.getComputerID()})
+            end
+        end
+    end
+    )
+else
+    while true do
+        modem.transmit(holoport,holoport,{Protocol="HologramPing",Coords={x = x, y = y, z = z},hologram=hologram.shapesOff,id=os.getComputerID()})
+        os.sleep(5)
+    end
 end
