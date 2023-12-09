@@ -17,7 +17,18 @@ elseif modelfile:match(".3dj") then
     assert(model,"Invalid model")
     
     for k,v in pairs(model.shapesOff) do
-        hologram[k] = {
+        hologram.shapesOff[k] = {
+            x = v.bounds[1]/16,
+            y = v.bounds[2]/16+1,
+            z = v.bounds[3]/16,
+            w = (v.bounds[4]/16-v.bounds[1]/16),
+            h = (v.bounds[5]/16-v.bounds[2]/16),
+            d = (v.bounds[6]/16-v.bounds[3]/16),
+            c = tonumber("0x"..v.tint.."ff")
+        }
+    end
+    for k,v in pairs(model.shapesOn) do
+        hologram.shapesOn[k] = {
             x = v.bounds[1]/16,
             y = v.bounds[2]/16+1,
             z = v.bounds[3]/16,
