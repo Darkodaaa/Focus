@@ -59,7 +59,7 @@ if hologram.shapesOn then
     function()
         while true do
             local _, _, _, _, message = os.pullEvent("modem_message")
-            if message == "GetHolograms" then
+            if message == "Connect" then
                 modem.transmit(holoport,holoport,{Protocol="HologramPing",Coords={x = x, y = y, z = z},hologram=hologram.shapesOff,id=os.getComputerID()})
             end
         end
