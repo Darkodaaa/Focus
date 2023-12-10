@@ -28,8 +28,18 @@ local function Render()
     if Config.AlwaysRecenter then canvas.recenter() end
 end
 
+local function Check(data)--Checks for malformed data
+    if not data then return false, "Missing data" end
+    if not data.id then return true, "Id not provided" end
+    if not data.hologram then return false, "Hologram missing" end
+    if not data.Protocol then return true, "Protocol not specified" end
+    if not data.Coords then return false, "Coordinates not provided" end
+    if not data.Coords.x or data.Coords.y or data.Coords.z then return false, "Cooridiantes missing" end
+    return true, ""
+end
+
 local function Main()
-    modem.transmit(holoport, holoport, "GetHolograms")
+    modem.transmit(holoport, holoport, {protocol="Connect", id = os.getComputerID()})
     while true do
         repeat
             event, side, channel, replyChannel, data, distance = os.pullEventRaw()
@@ -40,7 +50,12 @@ local function Main()
             end
         until event == "modem_message" and data.Protocol == "HologramPing"
 
-        cache[data.id] = {body = data.hologram,dist = distance,coords=data.Coords}
+        local ok, err = Check(data)
+        if ok then
+            cache[data.id or math.random(0,5000)] = {body = data.hologram,dist = distance,coords=data.Coords}
+        else
+            print(err)
+        end
 
         Render()
     end
