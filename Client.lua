@@ -34,7 +34,7 @@ local function Check(data)--Checks for malformed data
     if not data.hologram then return false, "Hologram missing" end
     if not data.Protocol then return true, "Protocol not specified" end
     if not data.Coords then return false, "Coordinates not provided" end
-    if not data.Coords.x or data.Coords.y or data.Coords.z then return false, "Cooridiantes missing" end
+    if not data.Coords.x or not data.Coords.y or not data.Coords.z then return false, "Cooridiantes missing" end
     return true, ""
 end
 
