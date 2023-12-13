@@ -1,13 +1,25 @@
-local api = {}
+local lib = {}
+
+--################################
+--Functions for libary use
+--################################
+
+local function getIndex(table, filter)
+    for k,v in pairs(table) do
+        if pcall(filter(v)) then
+            return k
+        end
+    end
+end
 
 --################################
 --Functions for use
 --################################
 
-function api.convert(raw)
+function lib.convert(raw)
     local json = textutils.unserialiseJSON(raw)
     local hologram = {}
-    for k,v in pairs(model.shapesOff) do
+    for k,v in pairs(json.shapesOff) do
         hologram.shapesOff[k] = {
             x = v.bounds[1]/16,
             y = v.bounds[2]/16+1,
@@ -18,7 +30,7 @@ function api.convert(raw)
             c = tonumber("0x"..v.tint.."ff")
         }
     end
-    for k,v in pairs(model.shapesOn) do
+    for k,v in pairs(json.shapesOn) do
         hologram.shapesOn[k] = {
             x = v.bounds[1]/16,
             y = v.bounds[2]/16+1,
@@ -30,6 +42,31 @@ function api.convert(raw)
         }
     end
     return hologram
+end
+
+
+--################################
+--Functions for transforms
+--################################
+
+local transform = {}
+
+function transform:move(x, y, z)
+    local hologram = self.hologram
+    for k,v in pairs(hologram.shapesOff) do
+        hologram.shapesOff[k] = {
+            x = v.x+x,
+            y = v.y+y,
+            z = v.z+z,
+        }
+    end
+    for k,v in pairs(hologram.shapesOn) do
+        hologram.shapesOn[k] = {
+            x = v.x+x,
+            y = v.y+y,
+            z = v.z+z,
+        }
+    end
 end
 
 --################################
@@ -48,7 +85,8 @@ local function loadFile(context, filename)
 
     local entry = {
         properties = {
-            name = filename
+            name = filename,
+            hasTransform = false
         },
         hologram = {}
     }
@@ -56,13 +94,19 @@ local function loadFile(context, filename)
         entry.hologram = textutils.unserialise(file)
         entry.properties.type = "holo"
     elseif filename:match(".3dj") then
-        entry.hologram = api.convert(file)
+        entry.hologram = lib.convert(file)
         entry.properties.type = "3dj"
     end
 
     table.insert(context.holograms, entry)
-    context.hologram = entry
     return entry
+end
+
+local function saveFile(context, filename)
+    local f = fs.open(filename, "w")
+    assert(f, "Couldn't open file")
+    f.write(context.holograms[getIndex(context.holograms2, function(v) return v.properties.name == filename end)])
+    f.close()
 end
 
 local function removeFile(context, name)
@@ -76,19 +120,47 @@ local function removeFile(context, name)
     return entry
 end
 
+local function changeFile(context, filename)
+    local entry = {}
+    for k,v in pairs(context.holograms) do
+        if v.properties.name == name then
+            entry = v
+            context.holograms[k] = context.loadFile({}, filename)
+        end
+    end
+    return entry
+end
+
+local function cast(context, x, y, z, hologram, state)
+    if type(hologram) == "string" then
+        hologram = context.holograms[getIndex(context.holograms2, function(v) return v.properties.name == hologram end)]
+    elseif type(hologram) == "number" then
+        hologram = context.holograms[hologram]
+    end
+    if not hologram[state] then error("Invalid state: "..state) end
+    context.modem.transmit(context.holoport,context.holoport,{Protocol="HologramPing",Coords={x = x, y = y, z = z},hologram=hologram[state],id=os.getComputerID()})
+end
+
 local function stream(context, name)
     local stream = {
-        state = false,
+        running = false,
         hologram = {},
+        state = "shapesOff",
         start = function(self)
-            self.state = true
-            local x,y,z = gps.locate(3)
-            while self.state do
-                context.modem.transmit(context.holoport,context.holoport,{Protocol="HologramPing",Coords={x = x, y = y, z = z},hologram=self.hologram.shapesOff,id=os.getComputerID()})
+            self.running = true
+            local x, y, z = gps.locate(3)
+            while self.running do
+                context:cast(x, y, z, self.hologram, self.state)
                 os.sleep(5)
             end
         end,
-        stop = function(self) self.state = false end,
+        stop = function(self) self.running = false end,
+        setState = function(self, state)
+            if not self.hologram[state] then error("Invalid state: "..state) end
+            self.state = state
+            local x,y,z = gps.locate(3)
+            context:cast(x, y, z, self.hologram, self.state)
+        end
     }
     stream.hologram = {}
     for k,v in pairs(context.holograms) do
@@ -100,7 +172,17 @@ local function stream(context, name)
     return stream
 end
 
-function api.createContext(options)
+local function addTransformToFile(context, name)
+    local file = context.holograms[name]
+    file.properties.hasTransform = true
+    file.transform = transform
+end
+
+local function getTransform(context, name)
+    return context.holograms[name].properties.hasTransform and context.holograms.transform[name] or nil
+end
+
+function lib.createContext(options)
     if not options then
         options = {}
     end
@@ -109,59 +191,38 @@ function api.createContext(options)
         modem = options.modem or peripheral.find("modem"),
         holograms = {},
         loadFile = loadFile,
+        saveFile = saveFile,
         removeFile= removeFile,
+        changeFile= changeFile,
+        cast = cast,
         stream = stream,
+        addTransformToFile = addTransformToFile,
+        addTransform = addTransformToFile,
+        getTransform = getTransform,
     }
 end
 
+return lib
 --[[
-    local api = require("api")
-    local context = api.createContext()
-    context:loadFile("model.holo")
-    local stream = context:stream("model.holo")
-    parallel.waitForAll(
-        function()
-            stream:start()
-        end,
-        function()
-            os.sleep(5)
-            stream:stop()
-        end
-    )
-    
-]]
-
---[[
-    start = function(self)
-            self.state = true
-            if self.hologram.shapesOn then
-                parallel.waitForAny(function()
-                    local signal = false
-                    while self.state do
-                        local lastsignal = signal
-                        signal = rs.getInput("left") or rs.getInput("right") or rs.getInput("front") or rs.getInput("back") or rs.getInput("top") or rs.getInput("bottom")
-                        if signal ~= lastsignal then
-                            context.modem.transmit(context.holoport,context.holoport,{Protocol="HologramPing",Coords={x = x, y = y, z = z},hologram = signal and self.hologram.shapesOn or self.hologram.shapesOff,id=os.getComputerID()})
-                        end
-                        os.sleep(0)
-                    end
-                end,
-                function()
-                    while self.state do
-                        local _, _, _, _, message = os.pullEvent("modem_message")
-                        if message == "GetHolograms" then
-                            context.modem.transmit(context.holoport,context.holoport,{Protocol="HologramPing",Coords={x = x, y = y, z = z},hologram=self.hologram.shapesOff,id=os.getComputerID()})
-                        end
-                    end
-                end
-                )
-            else
-                while self.state do
-                    context.modem.transmit(context.holoport,context.holoport,{Protocol="HologramPing",Coords={x = x, y = y, z = z},hologram=self.hologram.shapesOff,id=os.getComputerID()})
-                    os.sleep(5)
-                end
+local api = require("API")
+local context = api.createContext()
+context:loadFile("model.holo")
+local stream = context:stream("model.holo")
+parallel.waitForAll(
+    function()
+        stream:start()
+    end,
+    function()
+        while true do
+            local lastsignal = signal
+            signal = rs.getInput("left") or rs.getInput("right") or rs.getInput("front") or rs.getInput("back") or rs.getInput("top") or rs.getInput("bottom")
+            if signal ~= lastsignal then
+                stream:setState(signal and "shapesOn" or "shapesOff")
             end
-        end,
+            os.sleep()
+        end
+        --os.sleep(10)
+        --stream:stop()
+    end
+)
 ]]
-
-return api
