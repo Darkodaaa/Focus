@@ -16,6 +16,9 @@ end
 --Functions for use
 --################################
 
+--- Converts a .3dj json to a hologram table
+--- @param raw json to be converted to a hologram table
+--- @return table The hologram table
 function lib.convert(raw)
     local json = textutils.unserialiseJSON(raw)
     local hologram = {}
@@ -83,6 +86,8 @@ end
 --Functions for the context
 --################################
 
+--- Loads a file into the context, tries to resolve and covert if needed
+--- @param filename string The name of the file to load
 local function loadFile(context, filename)
     local f
     f = fs.open(filename, "r")
@@ -115,13 +120,18 @@ local function loadFile(context, filename)
     return entry
 end
 
-local function saveFile(context, filename)
+--- Saves a file from the contex for later use
+--- @param name string The name of the hologram to save
+--- @param filename string The filename to save to
+local function saveFile(context, name, filename)
     local f = fs.open(filename, "w")
     assert(f, "Couldn't open file")
-    f.write(context.holograms[getIndex(context.holograms2, function(v) return v.properties.name == filename end)])
+    f.write(context.holograms[getIndex(context.holograms2, function(v) return v.properties.name == name end)])
     f.close()
 end
 
+--- Removes a hologram from the context
+--- @param name string The name of the holram to remove
 local function removeFile(context, name)
     local entry = {}
     for k,v in pairs(context.holograms) do
@@ -133,7 +143,11 @@ local function removeFile(context, name)
     return entry
 end
 
-local function changeFile(context, filename)
+--- Changes a hologram in the context by name to a different file
+--- @param name string The name of the hologram to change
+--- @param filename string The name of the file to change the holram to
+--- @return table The hologram's entry in the context
+local function changeFile(context, name, filename)
     local entry = {}
     for k,v in pairs(context.holograms) do
         if v.properties.name == name then
@@ -144,6 +158,12 @@ local function changeFile(context, filename)
     return entry
 end
 
+--- Casts sends a packed containing the hologram information
+--- @param x number The x coordinate to render the hologram to
+--- @param y number The y coordinate to render the hologram to
+--- @param z number The z coordinate to render the hologram to
+--- @param hologram table The hologram to cast
+--- @param state string The state of the hologram
 local function cast(context, x, y, z, hologram, state)
     if type(hologram) == "string" then
         hologram = context.holograms[getIndex(context.holograms2, function(v) return v.properties.name == hologram end)]
@@ -154,6 +174,8 @@ local function cast(context, x, y, z, hologram, state)
     context.modem.transmit(context.holoport,context.holoport,{Protocol="HologramPing",Coords={x = x, y = y, z = z},hologram=hologram[state],id=os.getComputerID()})
 end
 
+--- Makes a stream for streaming holograms
+--- @param name string Name of the holograms to stream
 local function stream(context, name)
     local stream = {
         running = false,
@@ -185,10 +207,6 @@ local function stream(context, name)
     end
 
     return stream
-end
-
-local function getTransform(context, name)
-    return context.holograms[name].properties.hasTransform and context.holograms.transform[name] or nil
 end
 
 function lib.createContext(options)
