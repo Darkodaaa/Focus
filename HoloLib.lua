@@ -49,26 +49,36 @@ end
 --Functions for transforms
 --################################
 
+--[[ Transforms are currently not working well
 local transform = {}
 
-function transform:move(x, y, z)
+function transform.setPos(self, x, y, z)
     local hologram = self.hologram
-    for k,v in pairs(hologram.shapesOff) do
-        hologram.shapesOff[k] = {
-            x = v.x+x,
-            y = v.y+y,
-            z = v.z+z,
-        }
-    end
-    for k,v in pairs(hologram.shapesOn) do
-        hologram.shapesOn[k] = {
-            x = v.x+x,
-            y = v.y+y,
-            z = v.z+z,
-        }
+    x, y, z = x or 0, y or 0, z or 0
+    self.offset.x = x
+    self.offset.y = y
+    self.offset.z = z
+    for k,state in pairs(hologram) do
+        for k,v in pairs(state) do
+            state[k].x = v.x+x/8
+            state[k].y = v.y+y/8
+            state[k].z = v.z+z/8
+        end
     end
 end
 
+function transform.getPos(self)
+    return self.offset.x, self.offset.y, self.offset.z
+end
+
+function transform.move(self, x, y, z)
+    local hologram = self.hologram
+    x, y, z = x or 0, y or 0, z or 0
+    local offset = {self:getPos()}
+    print(textutils.serialise(offset))
+    self:setPos(self.offset.x + x, self.offset.y + y, self.offset.z + z)
+end
+]]
 --################################
 --Functions for the context
 --################################
@@ -86,6 +96,7 @@ local function loadFile(context, filename)
     local entry = {
         properties = {
             name = filename,
+            label = "",
             hasTransform = false
         },
         hologram = {}
@@ -98,6 +109,8 @@ local function loadFile(context, filename)
         entry.properties.type = "3dj"
     end
 
+    entry.properties.label = entry.hologram.label
+    entry.hologram.label = nil
     table.insert(context.holograms, entry)
     return entry
 end
@@ -146,11 +159,14 @@ local function stream(context, name)
         running = false,
         hologram = {},
         state = "shapesOff",
+        cast = function(self)
+            local x, y, z = gps.locate(3)
+            context:cast(x, y, z, self.hologram, self.state)
+        end,
         start = function(self)
             self.running = true
-            local x, y, z = gps.locate(3)
             while self.running do
-                context:cast(x, y, z, self.hologram, self.state)
+                self:cast()
                 os.sleep(5)
             end
         end,
@@ -158,10 +174,9 @@ local function stream(context, name)
         setState = function(self, state)
             if not self.hologram[state] then error("Invalid state: "..state) end
             self.state = state
-            local x,y,z = gps.locate(3)
-            context:cast(x, y, z, self.hologram, self.state)
-        end
+        end,
     }
+    --for k,v in pairs(transform) do stream[k] = v end
     stream.hologram = {}
     for k,v in pairs(context.holograms) do
         if v.properties.name == name then
@@ -170,12 +185,6 @@ local function stream(context, name)
     end
 
     return stream
-end
-
-local function addTransformToFile(context, name)
-    local file = context.holograms[name]
-    file.properties.hasTransform = true
-    file.transform = transform
 end
 
 local function getTransform(context, name)
@@ -196,9 +205,6 @@ function lib.createContext(options)
         changeFile= changeFile,
         cast = cast,
         stream = stream,
-        addTransformToFile = addTransformToFile,
-        addTransform = addTransformToFile,
-        getTransform = getTransform,
     }
 end
 
