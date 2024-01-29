@@ -102,7 +102,7 @@ local function loadFile(context, filename)
         properties = {
             name = filename,
             label = "",
-            hasTransform = false
+            id = #context.holograms + 1,
         },
         hologram = {}
     }
@@ -158,6 +158,16 @@ local function changeFile(context, name, filename)
     return entry
 end
 
+--- Returns a hologram object and the id of the entry in the context
+--- @param context table The context to use
+--- @param name string The name of the hologram to get
+local function getHologram(context, name)
+    for k,v in pairs(context.holograms) do
+        if v.properties.name == name then
+            return v.hologram, k
+        end
+    end
+end
 --- Casts sends a packed containing the hologram information
 --- @param x number The x coordinate to render the hologram to
 --- @param y number The y coordinate to render the hologram to
@@ -179,6 +189,7 @@ end
 local function stream(context, name)
     local stream = {
         running = false,
+        id = 0,
         hologram = {},
         state = "shapesOff",
         cast = function(self)
@@ -199,13 +210,7 @@ local function stream(context, name)
         end,
     }
     --for k,v in pairs(transform) do stream[k] = v end
-    stream.hologram = {}
-    for k,v in pairs(context.holograms) do
-        if v.properties.name == name then
-            stream.hologram = v.hologram
-        end
-    end
-
+    stream.hologram, stream.id = getHologram(context, name)
     return stream
 end
 
@@ -213,10 +218,12 @@ function lib.createContext(options)
     if not options then
         options = {}
     end
+    local modem = options.modem or peripheral.find("modem")
+    assert(not modem,"No modem found or given as an option")
     return {
         holoport = options.port or 65530,
-        modem = options.modem or peripheral.find("modem"),
-        holograms = {},
+        modem = modem,
+        holograms = options.holograms or {},
         loadFile = loadFile,
         saveFile = saveFile,
         removeFile= removeFile,
