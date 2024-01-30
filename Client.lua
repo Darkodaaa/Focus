@@ -31,12 +31,12 @@ end
 
 local function Check(data)--Checks for malformed data
     --Chacking if the required data exists
-    if not data then return false, "Missing data" end
-    if not data.id then return true, "Id not provided" end
-    if not data.hologram then return false, "Hologram missing" end
-    if not data.Protocol then return true, "Protocol not specified" end
-    if not data.Coords then return false, "Coordinates not provided" end
-    if not data.Coords.x or not data.Coords.y or not data.Coords.z then return false, "Cooridiantes missing" end
+    if not data then return false, "Missing data." end
+    if not data.id then return true, "Id not provided." end
+    if not data.hologram then return false, "Hologram missing." end
+    if not data.Protocol then return true, "Protocol not specified." end
+    if not data.Coords then return false, "Coordinates not provided." end
+    if not data.Coords.x or not data.Coords.y or not data.Coords.z then return false, "Cooridiantes missing." end
 
     --Checking data types
     if type(data) ~= "table" then
