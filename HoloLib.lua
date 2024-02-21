@@ -1,259 +1,552 @@
-local lib = {}
+local api = {}
+local modem = peripheral.find("modem")
+local packetv = 1.0
+assert(modem,"No modem found")
 
---################################
---Functions for libary use
---################################
+local function loadJson(path)
+    assert(type(path) == "string", "Invalid path type: " .. type(path))
+    assert(path:match(".json"), "Invalid file type ")
+    local f = fs.open(path, "r")
+    local json = textutils.unserialiseJSON(f:readAll())
+    local err = "Missing: "
+    err = json.properties and err or err.."properties, "
+    err = json.cubes and err or err.."cubes, "
+    err = json.groups and err or err.."groups, "
+    assert(err=="Missing: ", err.."not found.")
+    f:close()
+    return json
+end
 
-local function getIndex(table, filter)
-    for k,v in pairs(table) do
-        if pcall(filter(v)) then
-            return k
-        end
+local function contains(table, value)
+    for k, v in pairs(table) do
+        if v == value then return true end
     end
+    return false
 end
 
---################################
---Functions for use
---################################
-
---- Converts a .3dj json to a hologram table
---- @param raw json to be converted to a hologram table
---- @return table The hologram table
-function lib.convert(raw)
-    local json = textutils.unserialiseJSON(raw)
-    local hologram = {}
-    for k,v in pairs(json.shapesOff) do
-        hologram.shapesOff[k] = {
-            x = v.bounds[1]/16,
-            y = v.bounds[2]/16+1,
-            z = v.bounds[3]/16,
-            w = (v.bounds[4]/16-v.bounds[1]/16),
-            h = (v.bounds[5]/16-v.bounds[2]/16),
-            d = (v.bounds[6]/16-v.bounds[3]/16),
-            c = tonumber("0x"..v.tint.."ff")
-        }
+local function resolveCoords(x, y, z, coords)
+    if not x or not y or not z then
+        x = x or coords[1]
+        y = y or coords[2]
+        z = z or coords[3]
     end
-    for k,v in pairs(json.shapesOn) do
-        hologram.shapesOn[k] = {
-            x = v.bounds[1]/16,
-            y = v.bounds[2]/16+1,
-            z = v.bounds[3]/16,
-            w = (v.bounds[4]/16-v.bounds[1]/16),
-            h = (v.bounds[5]/16-v.bounds[2]/16),
-            d = (v.bounds[6]/16-v.bounds[3]/16),
-            c = tonumber("0x"..v.tint.."ff")
-        }
+    return x, y, z
+end
+
+local function newInstance(class)
+    local instance = {}
+    for k, v in pairs(class) do
+        instance[k] = v
     end
-    return hologram
+    return instance
 end
 
+local function instanceOf(obj)
+    return obj.instance.properties.instanceType
+end
 
---################################
---Functions for transforms
---################################
+local function makeVirtual(obj, name)
+    table.insert(obj.virtual, name)
+end
 
---[[ Transforms are currently not working well
-local transform = {}
-
-function transform.setPos(self, x, y, z)
-    local hologram = self.hologram
-    x, y, z = x or 0, y or 0, z or 0
-    self.offset.x = x
-    self.offset.y = y
-    self.offset.z = z
-    for k,state in pairs(hologram) do
-        for k,v in pairs(state) do
-            state[k].x = v.x+x/8
-            state[k].y = v.y+y/8
-            state[k].z = v.z+z/8
-        end
+local function isVirtual(obj, name)
+    for k,v in pairs(obj.virtual) do
+        if k == name then return true end
     end
+    return false
 end
 
-function transform.getPos(self)
-    return self.offset.x, self.offset.y, self.offset.z
-end
-
-function transform.move(self, x, y, z)
-    local hologram = self.hologram
-    x, y, z = x or 0, y or 0, z or 0
-    local offset = {self:getPos()}
-    print(textutils.serialise(offset))
-    self:setPos(self.offset.x + x, self.offset.y + y, self.offset.z + z)
-end
-]]
---################################
---Functions for the context
---################################
-
---- Loads a file into the context, tries to resolve and covert if needed
---- @param filename string The name of the file to load
-local function loadFile(context, filename)
-    local f
-    f = fs.open(filename, "r")
-    if not f then
-        f = fs.open(shell.resolve(filename), "r")
-    end
-    assert(f, "Couldn't open file")
-    local file = f.readAll()
-    f.close()
-
-    local entry = {
-        properties = {
-            name = filename,
-            label = "",
-            id = #context.holograms + 1,
-        },
-        hologram = {}
-    }
-    if filename:match(".holo") then
-        entry.hologram = textutils.unserialise(file)
-        entry.properties.type = "holo"
-    elseif filename:match(".3dj") then
-        entry.hologram = lib.convert(file)
-        entry.properties.type = "3dj"
-    end
-
-    entry.properties.label = entry.hologram.label
-    entry.hologram.label = nil
-    table.insert(context.holograms, entry)
-    return entry
-end
-
---- Saves a file from the contex for later use
---- @param name string The name of the hologram to save
---- @param filename string The filename to save to
-local function saveFile(context, name, filename)
-    local f = fs.open(filename, "w")
-    assert(f, "Couldn't open file")
-    f.write(context.holograms[getIndex(context.holograms2, function(v) return v.properties.name == name end)])
-    f.close()
-end
-
---- Removes a hologram from the context
---- @param name string The name of the holram to remove
-local function removeFile(context, name)
-    local entry = {}
-    for k,v in pairs(context.holograms) do
-        if v.properties.name == name then
-            entry = v
-            context.holograms[k] = nil
-        end
-    end
-    return entry
-end
-
---- Changes a hologram in the context by name to a different file
---- @param name string The name of the hologram to change
---- @param filename string The name of the file to change the holram to
---- @return table The hologram's entry in the context
-local function changeFile(context, name, filename)
-    local entry = {}
-    for k,v in pairs(context.holograms) do
-        if v.properties.name == name then
-            entry = v
-            context.holograms[k] = context.loadFile({}, filename)
-        end
-    end
-    return entry
-end
-
---- Returns a hologram object and the id of the entry in the context
---- @param context table The context to use
---- @param name string The name of the hologram to get
-local function getHologram(context, name)
-    for k,v in pairs(context.holograms) do
-        if v.properties.name == name then
-            return v.hologram, k
-        end
-    end
-end
---- Casts sends a packed containing the hologram information
---- @param x number The x coordinate to render the hologram to
---- @param y number The y coordinate to render the hologram to
---- @param z number The z coordinate to render the hologram to
---- @param hologram table The hologram to cast
---- @param state string The state of the hologram
-local function cast(context, x, y, z, hologram, state)
-    if type(hologram) == "string" then
-        hologram = context.holograms[getIndex(context.holograms2, function(v) return v.properties.name == hologram end)]
-    elseif type(hologram) == "number" then
-        hologram = context.holograms[hologram]
-    end
-    if not hologram[state] then error("Invalid state: "..state) end
-    context.modem.transmit(context.holoport,context.holoport,{Protocol="HologramPing",Coords={x = x, y = y, z = z},hologram=hologram[state],id=os.getComputerID()})
-end
-
---- Makes a stream for streaming holograms
---- @param name string Name of the holograms to stream
-local function stream(context, name)
-    local stream = {
-        running = false,
-        id = 0,
-        hologram = {},
-        state = "shapesOff",
-        cast = function(self)
-            local x, y, z = gps.locate(3)
-            context:cast(x, y, z, self.hologram, self.state)
-        end,
-        start = function(self)
-            self.running = true
-            while self.running do
-                self:cast()
-                os.sleep(5)
-            end
-        end,
-        stop = function(self) self.running = false end,
-        setState = function(self, state)
-            if not self.hologram[state] then error("Invalid state: "..state) end
-            self.state = state
-        end,
-    }
-    --for k,v in pairs(transform) do stream[k] = v end
-    stream.hologram, stream.id = getHologram(context, name)
-    return stream
-end
-
-function lib.createContext(options)
-    if not options then
-        options = {}
-    end
-    local modem = options.modem or peripheral.find("modem")
-    assert(not modem,"No modem found or given as an option")
+local function initClass()
     return {
-        holoport = options.port or 65530,
-        modem = modem,
-        holograms = options.holograms or {},
-        loadFile = loadFile,
-        saveFile = saveFile,
-        removeFile= removeFile,
-        changeFile= changeFile,
-        cast = cast,
-        stream = stream,
+        keys = {
+            "keys",
+            "virtual",
+            "properties",
+            "makeVirtual",
+            "newInstance",
+            "instanceOf",
+        },
+        virtual = {},
+        properties = {
+            allowAddingValues=false,
+        },
+        makeVirtual = makeVirtual,
+        isVirtual = isVirtual,
+        newInstance = newInstance,
+        instanceOf = instanceOf,
     }
 end
 
-return lib
---[[
-local api = require("API")
-local context = api.createContext()
-context:loadFile("model.holo")
-local stream = context:stream("model.holo")
-parallel.waitForAll(
-    function()
-        stream:start()
-    end,
-    function()
-        while true do
-            local lastsignal = signal
-            signal = rs.getInput("left") or rs.getInput("right") or rs.getInput("front") or rs.getInput("back") or rs.getInput("top") or rs.getInput("bottom")
-            if signal ~= lastsignal then
-                stream:setState(signal and "shapesOn" or "shapesOff")
-            end
-            os.sleep()
+local function loadClass(obj, Constructor)
+    local function isProtected(key)
+        if (isVirtual(obj, key)) then
+            return false
         end
-        --os.sleep(10)
-        --stream:stop()
+        if (obj[key] == nil) then
+            return not obj.properties.allowAddingValues
+        end
+        for k, v in pairs(obj.keys) do
+            if k == key then return true end
+        end
+        return false
     end
-)
-]]
+    obj = Constructor(obj,{})
+    local metatable = {
+        __metatable = {},
+        __call = Constructor,
+        __newindex = function(self, k, v)
+            return isProtected(k) and nil or rawset(self, k, v)
+        end,
+        --[[__pairs = function (t)
+            return function (t, k)
+                local k, v
+                repeat
+                    k, v= next(t,k)
+                until k == nil or not isProtected(k)
+                return k, v
+            end, t, nil
+        end]]
+    }
+    return setmetatable(obj, metatable)
+end
+
+--Cube class declaration
+local cube = initClass()
+
+local function Constructor(self, options)
+    local instance = self:newInstance()
+    instance.properties.instanceType = "cube"
+
+    instance.color = options.color or "ffffffff"
+    instance.pivot = options.pivot or {x=0,y=0,z=0}
+    instance.rotation = options.rotation or {pitch=0,jaw=0,roll=0}
+    instance.positon = options.positon or {x=0,y=0,z=0}
+    instance.dimensions = options.dimensions or {w=0,h=0,d=0}
+    return instance
+end
+
+function cube:getColorHex()
+    return self.color
+end
+
+function cube:setColorHex(col)
+    local hex = self.color
+    self.color = hex
+    return hex
+end
+
+function cube:getColorRGB()
+    local hex = self.color
+    return tonumber("0x" .. hex:sub(1, 2)), tonumber("0x" .. hex:sub(3, 4)), tonumber("0x" .. hex:sub(5, 6))
+end
+
+function cube:setColorRGB(r, g, b)
+    local oldColor = self:getColorRGB()
+    self:setColorHex(string.format("%02X%02X%02X", r, g, b))
+    return oldColor
+end
+
+function cube:getPivot()
+    return self.Pivot
+end
+
+function cube:setPivot(...)
+    local args = {...}
+    local oldPivot = self.Pivot
+    local pivot = {x=0,y=0,z=0}
+    if #args == 1 then
+        assert(type(args[1]) == "table" and #args[1] == 3, "Invalid argument. If you provide one argument the type has to be a table with the pivot's coordinates.")
+        pivot.x = args[1][1] or args[1].x
+        pivot.y = args[1][2] or args[1].y
+        pivot.z = args[1][3] or args[1].z
+    elseif #args == 3 then
+        assert(#args == 3 and type(args[1]) == "number" and type(args[2]) == "number" and type(args[3]) == "number", "Invalid argument. If you provide three arguments the types have to numbers.")
+        pivot.x = args[1] or 0
+        pivot.y = args[2] or 0
+        pivot.z = args[3] or 0 
+    end
+    self.pivot = pivot
+    return oldPivot
+end
+
+function cube:getRotation()
+    return self.Rotation
+end
+
+function cube:setRotation(...)
+    local args = {...}
+    local oldRotation = self.rotation
+    local rotation = {pitch=0,jaw=0,roll=0}
+    if #args == 1 then
+        assert(type(args[1]) == "table" and #args[1] == 3, "Invalid argument. If you provide one argument the type has to be a table with the rotations.")
+        rotation.pitch = args[1][1] or args[1].pitch
+        rotation.jaw = args[1][2] or args[1].jaw
+        rotation.roll = args[1][3] or args[1].roll
+    elseif #args == 3 then
+        assert(#args == 3 and type(args[1]) == "number" and type(args[2]) == "number" and type(args[3]) == "number", "Invalid argument. If you provide three arguments the types have to numbers.")
+        rotation.pitch = args[1] or 0
+        rotation.jaw = args[2] or 0
+        rotation.roll = args[3] or 0 
+    end
+    self.rotation = rotation
+    return oldRotation
+end
+
+function cube:getPosition()
+    return self.Position
+end
+
+function cube:setPosition(...)
+    local args = {...}
+    local oldPosition = self.Position
+    local position = {x=0,y=0,z=0}
+    if #args == 1 then
+        assert(type(args[1]) == "table" and #args[1] == 3, "Invalid argument. If you provide one argument the type has to be a table with the cubes's coordinates.")
+        position.x = args[1][1] or args[1].x
+        position.y = args[1][2] or args[1].y
+        position.z = args[1][3] or args[1].z
+    elseif #args == 3 then
+        assert(#args == 3 and type(args[1]) == "number" and type(args[2]) == "number" and type(args[3]) == "number", "Invalid argument. If you provide three arguments the types have to numbers.")
+        position.x = args[1] or 0
+        position.y = args[2] or 0
+        position.z = args[3] or 0 
+    end
+    self.position = position
+    return oldPosition
+end
+
+function cube:getDimensions()
+    return self.Dimensions
+end
+
+function cube:setDimensions(...)
+    local args = {...}
+    local oldDimensions = self.Dimensions
+    local dimensions = {w=0,h=0,d=0}
+    if #args == 1 then
+        assert(type(args[1]) == "table" and #args[1] == 3, "Invalid argument. If you provide one argument the type has to be a table with the cubes's dimensions.")
+        dimensions.w = args[1][1] or args[1].w
+        dimensions.h = args[1][2] or args[1].h
+        dimensions.d = args[1][3] or args[1].d
+    elseif #args == 3 then
+        assert(#args == 3 and type(args[1]) == "number" and type(args[2]) == "number" and type(args[3]) == "number", "Invalid argument. If you provide three arguments the types have to numbers.")
+        dimensions.w = args[1] or 0
+        dimensions.h = args[2] or 0
+        dimensions.d = args[3] or 0 
+    end
+    self.dimensions = dimensions
+    return oldDimensions
+end
+
+api.cube = loadClass(cube, Constructor)
+
+--Group class declaration
+local group = initClass()
+
+local function Constructor(self, options)
+    local instance = self:newInstance()
+    instance.properties.instanceType = "group"
+
+    instance.children = options.children or {}
+    instance.name = options.name or "Group_"..math.random(1,99)--Making sure the name is unique
+    instance.pivot = options.pivot or {x=0,y=0,z=0}
+    return instance
+end
+
+function group:getPivot()
+    return self.Pivot
+end
+
+function group:setPivot(...)
+    local args = {...}
+    local oldPivot = self.Pivot
+    local pivot = {x=0,y=0,z=0}
+    if #args == 1 then
+        assert(type(args[1]) == "table" and #args[1] == 3, "Invalid argument. If you provide one argument the type has to be a table with the pivots coordinates.")
+        pivot.x = args[1][1] or args[1].x
+        pivot.y = args[1][2] or args[1].y
+        pivot.z = args[1][3] or args[1].z
+    elseif #args == 3 then
+        assert(#args == 3 and type(args[1]) == "number" and type(args[2]) == "number" and type(args[3]) == "number", "Invalid argument. If you provide three arguments the types have to numbers.")
+        pivot.x = args[1] or 0
+        pivot.y = args[2] or 0
+        pivot.z = args[3] or 0 
+    end
+    self.pivot = pivot
+    return oldPivot
+end
+
+function group:setName(name)
+    local oldName = self.name
+    self.name = name
+    return oldName
+end
+
+function group:getName()
+    return self.name
+end
+
+function group:addChild(...)
+    local args = {...}
+    assert((type(args[1]) == "table" and instanceOf(arg[1]) == "group") or type(args[1]) == "number", "Invalid argument type must be either group or number")
+    local child = instanceOf(arg[1]) == "group" and args[2] or args[1]
+    assert(contains(self.children, child), "Group already contains child.")
+    return table.insert(self.children, child)
+end
+
+function group:getChild(id)
+    return self.children[id]
+end
+
+function group:removeChild(id)
+    local child = self.children[id]
+    self.children[id] = nil
+    return child
+end
+
+api.group = loadClass(group, Constructor)
+
+--Hologram class declaration
+local hologram = initClass()
+
+local function Constructor(self, options)
+    local instance = self:newInstance()
+
+    instance.label = {displayText = "", coords = {x=0,y=0,z=0}}
+    if type(options.label) == "string" then
+        instance.label.displayText = options.label
+    elseif type(options.label) == "table" then
+        instance.label = options.label
+    end
+    instance.saveTo = options.saveTo
+    instance.port = options.port or 65530
+    instance.animations = options.animations or {}
+
+    local hologram = options.path and loadJson(options.path) or {properties = {label = {displayTeyt = "",position = {x = 0,y = 0,z = 0,},}},cubes = {},groups = {},}--Default hologram
+    for k,v in pairs(hologram) do
+        instance[k] = v
+    end
+
+    local ok, err = pcall(modem.open, instance.port)
+    if not ok then print("Error occured in hologram: "..err) end
+    return instance
+end
+
+function hologram:loadFile(path)
+    self.hologram = loadJson(path)
+end
+
+function hologram:save(path)
+    path = path or self.saveTo
+    assert(path, "I am telling you rn this path is not real!(It is a nil value)")
+    local f = fs.open(path, "w")
+    f.write(textutils.serialiseJSON(self.hologram))
+    f:close()
+end
+
+function hologram:getLabel()
+    return self.label
+end
+
+function hologram:setLabel(label)
+    assert(label.displayText, "Set a valid display text. Format: label = {displayText = \"\", coords = {x=0,y=0,z=0}}")
+    assert(label.coords and type(label.coords) == "table" and type(label.coords.x) == "number" and type(label.coords.y) == "number" and type(label.coords.z) == "number", "Set a valid coords. Format: label = {Set valid coords. Format: label = {displayText = \"\", coords = {x=0,y=0,z=0}}")
+    local old = self:getLabel()
+    self.label = label
+    return old 
+end
+
+function hologram:setLabelText(label)
+    local old = self:getLabel().displayText
+    self.label.displayText = label
+    return old
+end
+
+function hologram:setLabelPos(x, y, z)
+    assert(type(x) == "number", "Invalid x position type: " .. type(x))
+    assert(type(y) == "number", "Invalid y position type: " .. type(y))
+    assert(type(z) == "number", "Invalid z position type: " .. type(z))
+    local old = self:getLabel().coords
+    self.label.coords = {x=x, y=y, z=z}
+    return old
+end
+
+function hologram:getSavePath()
+    return self.savePath
+end
+
+function hologram:setSavePath(path)
+    local old = self:getSavePath()
+    self.saveTo = path or self.saveTo
+    return self.saveTo
+end
+
+function hologram:getPort()
+    return self.port
+end
+
+function hologram:setPort(port)
+    assert(type(port) == "number", "Invalid port type: " .. type(port))
+    assert(port < 0 or port > 65535, "Invalid port range: " .. port)
+    local old = self.port
+    self.port = port
+    return old
+end
+
+function hologram:getAnimations()
+    return self.animations
+end
+
+function hologram:getAnimation(name)
+    return self.animations[name]
+end
+
+function hologram:addAnimation(name, animation)
+    assert(self.animations[name], "Animation "..name.." already exists.")
+    assert(instanceOf(animation) ~= "animation", "Invalid animation format "..instanceOf(animation) or type(animation))
+    self.animations[name] = animation
+end
+
+function hologram:removeAnimation(name)
+    assert(not self.animations[name], "Animation "..name.." does not exists.")
+    local old = self.animations[name]
+    self.animations[name] = nil
+    return old
+end
+
+function hologram:getCubes()
+    return self.cubes
+end
+
+function hologram:getCube(id)
+    return self.cubes[id]
+end
+
+function hologram:addCube(cube)
+    -- TODO: must be an instance of cube
+    local id = #self.cubes + 1
+    self.cubes[id] = cube
+    return id
+end
+
+function hologram:setCube(id, cube)
+    assert(type(id) ~= "number", "Id type must be a number. Type: "..type(id))
+    assert(instanceOf(cube) ~="cube", "Cube must be an instance of cube. Instance: "..instanceOf(cube).."type cube")
+    local old = self.cubes[id]
+    self.cubes[id] = cube
+    return old
+end
+
+function hologram:getGroup(name)
+    for k, v in pairs(self.groups) do
+        if v.name == name then
+            return v, k
+        end
+    end
+    return nil
+end
+
+function hologram:addGroup(group)
+    -- TODO check for the group to be instance of group class
+    local index = #self.groups + 1
+    self.groups[index] = group
+    return index
+end
+
+function hologram:removeGroup(name)
+    local old,index = self:getGroup(name)
+    if not index then return end
+    self.groups[index] = nil
+    return old
+end
+
+function hologram:cast(x, y, z, state)
+    x, y, z = resolveCoords(x,y,z, {gps.locate()})
+    local hologram = state~=nil and self.hologram[state] or self.hologram
+    print("Casted:",self.port,self.port,textutils.serialise({Protocol="HologramPing",Coords={x = x, y = y, z = z},id=os.getComputerID()},{ compact = true, allow_repetitions = true }))
+    modem.transmit(self.port,self.port,{Protocol="HologramPing",packetVer=packetv,Coords={x = x, y = y, z = z},hologram=hologram,id=os.getComputerID()})
+end
+
+function hologram:kill()
+    modem.transmit(self.port, self.port, {Protocol="HologramKill",packetVer=packetv, id=os.getComputerID()})
+end
+
+api.hologram = loadClass(hologram, Constructor)
+
+--Stream class declaration
+
+local stream = initClass()
+
+local function Constructor(self, options)
+    local instance = self:newInstance()
+    instance.properties.instanceType = "stream"
+
+    instance.isEnabled = options.isEnabled or false
+    instance.hologram = options.hologram
+    instance.offset = {x = 0, y = 1, z = 0}
+    return instance
+end
+
+function stream:cast(x, y, z, state)
+    x, y, z = resolveCoords(x,y,z, {gps.locate()})
+    local offset = self:getOffset()
+    x, y, z = x + offset.x, y + offset.y, z + offset.z
+    self.hologram:cast(x, y, z, state)
+end
+
+function stream:enable()
+    self.isEnabled = true
+    self:onEnableNest()
+end
+
+function stream:disable()
+    self.isEnabled = false
+    self:onDisable()
+end
+
+function stream:setHologram(hologram)
+    self.hologram = hologram
+end
+
+function stream:getOffset()
+    return self.offset
+end
+
+function stream:setOffset(x, y, z)
+    x, y, z = resolveCoords(x,y,z, self:getOffset())
+    self.offset = {x=x, y=y, z=z}
+end
+
+function stream:onEnableNest()
+    parallel.waitForAny(function() self:onEnable() end,function()
+        while self.isEnabled do
+            local event, side, channel, replyChannel, data, distance
+            repeat
+                event, side, channel, replyChannel, data, distance = os.pullEvent("modem_message")
+            until type(data) == "table" and type(data.id) == "number" and type(data.position) == "table" and data.Protocol == "ClientConnect"
+            self:onClientConnect(data.id, data.position, distance)
+        end
+    end)
+end
+
+function stream:onEnable()
+    while self.isEnabled do
+        self:cast()
+        os.sleep(5)
+    end
+end
+stream:makeVirtual("onEnable")
+
+function stream:onDisable()
+    self.hologram:kill()
+end
+stream:makeVirtual("onDisable")
+
+function stream:onClientConnect(id, pos, distance)
+    self:cast(table.unpack(self.offset))
+end
+stream:makeVirtual("onClientConnect")
+
+api.stream = loadClass(stream, Constructor)
+
+return api
