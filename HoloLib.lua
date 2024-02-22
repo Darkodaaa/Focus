@@ -113,6 +113,14 @@ end
 --Cube class declaration
 local cube = initClass()
 
+--- Cube class
+--- @param options table Values that can be set at init. 
+--- @param colors table The color of the cube can be specified in options
+--- @param pivot table The pivot of the cube can be specified in options
+--- @param rotation table The rotation of the cube can be specified in options
+--- @param position table The position of the cube can be specified in options
+--- @param dimensions table The dimensions of the cube can be specified in options
+--- @return table An instance of the Cube class
 local function Constructor(self, options)
     local instance = self:newInstance()
     instance.properties.instanceType = "cube"
@@ -125,40 +133,68 @@ local function Constructor(self, options)
     return instance
 end
 
+--- Return the color of the given cube as a hex string
+---@return string The color of the given cube in hex as a string
 function cube:getColorHex()
     return self.color
 end
 
+--- Sets the color of the given cube as a hex string
+--- @param col string The hex color to set to the cube
+--- @return string The previous color of the given cube
 function cube:setColorHex(col)
+    assert(type(col) == "string","Invalid argument #1 color must be as string")
     local hex = self.color
     self.color = hex
     return hex
 end
 
+--- Gets the color of the given cube as rgb values
+--- @return number The red value of the color of the cube
+--- @return number The green value of the color of the cube
+--- @return number The blue value of the color of the cube
 function cube:getColorRGB()
     local hex = self.color
     return tonumber("0x" .. hex:sub(1, 2)), tonumber("0x" .. hex:sub(3, 4)), tonumber("0x" .. hex:sub(5, 6))
 end
 
+--- Sets to color of the cube by rgb values
+--- @param number The red value of the color
+--- @param number The green value of the color
+--- @param number The blue value of the color
+--- @return number The red value of the previous color
+--- @return number The green value of the previous color
+--- @return number The blue value of the previous color
 function cube:setColorRGB(r, g, b)
-    local oldColor = self:getColorRGB()
+    assert(type(r) == "number", "Invalid argument #1 red must be a number")
+    assert(type(g) == "number", "Invalid argument #2 green must be a number")
+    assert(type(b) == "number", "Invalid argument #3 blue must be a number")
+    local r, g, b = self:getColorRGB()
     self:setColorHex(string.format("%02X%02X%02X", r, g, b))
-    return oldColor
+    return r, g, b
 end
 
+--- Gets the pivot of the cube
+--- @return table The pivot of the cube
 function cube:getPivot()
     return self.Pivot
 end
 
+--- Sets the pivot of the cube
+--- @param table The pivot containing x, y and z value of the postion of the pivot
+--- @param number x The x position of the pivot
+--- @param number y The y position of the pivot
+--- @param number z The z position of the pivot
+--- @return table The pervious pivot of the cube
 function cube:setPivot(...)
     local args = {...}
     local oldPivot = self.Pivot
     local pivot = {x=0,y=0,z=0}
     if #args == 1 then
         assert(type(args[1]) == "table" and #args[1] == 3, "Invalid argument. If you provide one argument the type has to be a table with the pivot's coordinates.")
-        pivot.x = args[1][1] or args[1].x
-        pivot.y = args[1][2] or args[1].y
-        pivot.z = args[1][3] or args[1].z
+        pivot.x = args[1][1] or args[1].x or 0
+        pivot.y = args[1][2] or args[1].y or 0
+        pivot.z = args[1][3] or args[1].z or 0
     elseif #args == 3 then
         assert(#args == 3 and type(args[1]) == "number" and type(args[2]) == "number" and type(args[3]) == "number", "Invalid argument. If you provide three arguments the types have to numbers.")
         pivot.x = args[1] or 0
@@ -169,10 +205,18 @@ function cube:setPivot(...)
     return oldPivot
 end
 
+--- Gets the rotation of the cube
+--- @return table The rotation of the cube in pitch, yaw, and roll
 function cube:getRotation()
     return self.Rotation
 end
 
+--- Sets the rotation of the cube
+--- @param table The rotation of the cube in pitch, yaw, and roll
+--- @param number The pitch of the cube
+--- @param number The yaw of the cube
+--- @param number The roll of the cube
+--- @return table The previous rotation of the cube
 function cube:setRotation(...)
     local args = {...}
     local oldRotation = self.rotation
@@ -192,10 +236,18 @@ function cube:setRotation(...)
     return oldRotation
 end
 
+--- Gets the position of the cube
+--- @return table The postion of the cube
 function cube:getPosition()
     return self.Position
 end
 
+--- Sets the position of the cube
+--- @param table The position of the cube
+--- @param number The x position of the cube
+--- @param number The y position of the cube
+--- @param number The z position of the cube
+--- @return table The previous position of the cube
 function cube:setPosition(...)
     local args = {...}
     local oldPosition = self.Position
@@ -215,10 +267,18 @@ function cube:setPosition(...)
     return oldPosition
 end
 
+--- Gets the dimensions of the cube in width, height and depth
+--- @returns table The dimensions of the cube
 function cube:getDimensions()
     return self.Dimensions
 end
 
+--- Sets the dimensions of the cube in width, height and depth
+--- @param table rotation The dimensions of the cube
+--- @param number width The width of the cube
+--- @param number height The height of the cube
+--- @param number depth The depth of the cube
+--- @return table The previous dimensions of the cube
 function cube:setDimensions(...)
     local args = {...}
     local oldDimensions = self.Dimensions
@@ -543,7 +603,7 @@ end
 stream:makeVirtual("onDisable")
 
 function stream:onClientConnect(id, pos, distance)
-    self:cast(table.unpack(self.offset))
+    self:cast()
 end
 stream:makeVirtual("onClientConnect")
 
