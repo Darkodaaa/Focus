@@ -378,6 +378,7 @@ local function Constructor(self, options)
     elseif type(options.label) == "table" then
         instance.label = options.label
     end
+    instance.path = options.path or ""
     instance.saveTo = options.saveTo
     instance.port = options.port or 65530
     instance.animations = options.animations or {}
@@ -393,7 +394,8 @@ local function Constructor(self, options)
 end
 
 function hologram:loadFile(path)
-    self.hologram = loadJson(path)
+    self.path = path
+    self.hologram = loadJson(self.path)
 end
 
 function hologram:save(path)
