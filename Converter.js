@@ -124,7 +124,7 @@ model.elements.forEach(async function(element, key, array) {
     let cube = {};
     let face = element.faces.north;
     cube.color = await getPixelColor(texturesDir+"\\"+getTextureByKey(face.texture.slice(1))+".png", face.uv[0], face.uv[1]);
-    cube.rotation = {"pitch" : 0, "roll" : 0, "jaw" : 0};
+    /*cube.rotation = {"pitch" : 0, "roll" : 0, "jaw" : 0};
     if (element.rotation === undefined) {
         cube.pivot = {"x": 0, "y": 0, "z": 0};
     } else {
@@ -134,7 +134,7 @@ model.elements.forEach(async function(element, key, array) {
             case "y": cube.rotation.yaw = element.rotation.angle; break;
             case "z": cube.rotation.pitch = element.rotation.angle; break;
         };
-    }
+    }*/
     cube.position = {"x": element.from[0], "y": element.from[1], "z": element.from[2]};
     cube.dimensions = {"w" : element.to[0]-element.from[0], "h" : element.to[1]-element.from[1], "d" : element.to[2]-element.from[2]};
     converted.cubes.push(cube);

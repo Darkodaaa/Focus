@@ -117,7 +117,6 @@ local cube = initClass()
 --- @param options table Values that can be set at init. 
 --- @param colors table The color of the cube can be specified in options
 --- @param pivot table The pivot of the cube can be specified in options
---- @param rotation table The rotation of the cube can be specified in options
 --- @param position table The position of the cube can be specified in options
 --- @param dimensions table The dimensions of the cube can be specified in options
 --- @return table An instance of the Cube class
@@ -127,7 +126,6 @@ local function Constructor(self, options)
 
     instance.color = options.color or "ffffffff"
     instance.pivot = options.pivot or {x=0,y=0,z=0}
-    instance.rotation = options.rotation or {pitch=0,jaw=0,roll=0}
     instance.positon = options.positon or {x=0,y=0,z=0}
     instance.dimensions = options.dimensions or {w=0,h=0,d=0}
     return instance
@@ -205,37 +203,6 @@ function cube:setPivot(...)
     return oldPivot
 end
 
---- Gets the rotation of the cube
---- @return table The rotation of the cube in pitch, yaw, and roll
-function cube:getRotation()
-    return self.Rotation
-end
-
---- Sets the rotation of the cube
---- @param table The rotation of the cube in pitch, yaw, and roll
---- @param number The pitch of the cube
---- @param number The yaw of the cube
---- @param number The roll of the cube
---- @return table The previous rotation of the cube
-function cube:setRotation(...)
-    local args = {...}
-    local oldRotation = self.rotation
-    local rotation = {pitch=0,jaw=0,roll=0}
-    if #args == 1 then
-        assert(type(args[1]) == "table" and #args[1] == 3, "Invalid argument. If you provide one argument the type has to be a table with the rotations.")
-        rotation.pitch = args[1][1] or args[1].pitch
-        rotation.jaw = args[1][2] or args[1].jaw
-        rotation.roll = args[1][3] or args[1].roll
-    elseif #args == 3 then
-        assert(#args == 3 and type(args[1]) == "number" and type(args[2]) == "number" and type(args[3]) == "number", "Invalid argument. If you provide three arguments the types have to numbers.")
-        rotation.pitch = args[1] or 0
-        rotation.jaw = args[2] or 0
-        rotation.roll = args[3] or 0 
-    end
-    self.rotation = rotation
-    return oldRotation
-end
-
 --- Gets the position of the cube
 --- @return table The postion of the cube
 function cube:getPosition()
@@ -274,7 +241,7 @@ function cube:getDimensions()
 end
 
 --- Sets the dimensions of the cube in width, height and depth
---- @param table rotation The dimensions of the cube
+--- @param table dimensions The dimensions of the cube
 --- @param number width The width of the cube
 --- @param number height The height of the cube
 --- @param number depth The depth of the cube
@@ -389,7 +356,7 @@ local function Constructor(self, options)
     end
 
     local ok, err = pcall(modem.open, instance.port)
-    if not ok then print("Error occured in hologram: "..err) end
+    if not ok then print("Error occured in hologram's port: "..err) end
     return instance
 end
 
