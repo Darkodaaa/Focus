@@ -1,4 +1,4 @@
-local api = require("holoapi")
+local api = require("HoloLib")
 
 local hologram = api.hologram({
     path = "Test.json",

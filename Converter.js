@@ -28,6 +28,11 @@ let converted = {
                 "y": 0,
                 "z": 0
             },
+            "rotation": {
+                "pitch" : 0, 
+                "roll" : 0, 
+                "jaw" : 0
+            }
         },
     },
     "cubes" : [],

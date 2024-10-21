@@ -5,7 +5,7 @@ assert(modem,"No modem found")
 
 local function loadJson(path)
     assert(type(path) == "string", "Invalid path type: " .. type(path))
-    assert(path:match(".json"), "Invalid file type ")
+    assert(path:match(".json"), "Invalid file type. Must be JSON.")
     local f = fs.open(path, "r")
     local json = textutils.unserialiseJSON(f:readAll())
     local err = "Missing: "
@@ -339,7 +339,7 @@ local hologram = initClass()
 local function Constructor(self, options)
     local instance = self:newInstance()
 
-    instance.label = {displayText = "", coords = {x=0,y=0,z=0}}
+    instance.label = {displayText = "Test", coords = {x=0,y=0.5,z=0}, rotation = {pitch = 0, yaw = 0, roll = 0}}
     if type(options.label) == "string" then
         instance.label.displayText = options.label
     elseif type(options.label) == "table" then
@@ -350,7 +350,7 @@ local function Constructor(self, options)
     instance.port = options.port or 65530
     instance.animations = options.animations or {}
 
-    local hologram = options.path and loadJson(options.path) or {properties = {label = {displayTeyt = "",position = {x = 0,y = 0,z = 0,},}},cubes = {},groups = {},}--Default hologram
+    local hologram = options.path and loadJson(options.path) or {properties = {},cubes = {},groups = {},}--Default hologram
     for k,v in pairs(hologram) do
         instance[k] = v
     end
@@ -362,7 +362,9 @@ end
 
 function hologram:loadFile(path)
     self.path = path
-    self.hologram = loadJson(self.path)
+    for k,v in pairs(loadJson(self.path)) do
+        instance[k] = v
+    end
 end
 
 function hologram:save(path)
@@ -397,6 +399,15 @@ function hologram:setLabelPos(x, y, z)
     assert(type(z) == "number", "Invalid z position type: " .. type(z))
     local old = self:getLabel().coords
     self.label.coords = {x=x, y=y, z=z}
+    return old
+end
+
+function hologram:setLabelRotation(pitch, yaw, roll)
+    assert(type(pitch) == "number", "Invalid pitch position type: " .. type(pitch))
+    assert(type(yaw) == "number", "Invalid yaw position type: " .. type(yaw))
+    assert(type(roll) == "number", "Invalid z position type: " .. type(roll))
+    local old = self:getLabel().rotation
+    self.label.rotation = {pitch=pitch, yaw=yaw, roll=roll}
     return old
 end
 
@@ -491,7 +502,7 @@ end
 
 function hologram:cast(x, y, z, state)
     x, y, z = resolveCoords(x,y,z, {gps.locate()})
-    local hologram = state~=nil and self.hologram[state] or self.hologram
+    local hologram = self --state~=nil and self.hologram[state] or
     print("Casted:",self.port,self.port,textutils.serialise({Protocol="HologramPing",Coords={x = x, y = y, z = z},id=os.getComputerID()},{ compact = true, allow_repetitions = true }))
     modem.transmit(self.port,self.port,{Protocol="HologramPing",packetVer=packetv,Coords={x = x, y = y, z = z},hologram=hologram,id=os.getComputerID()})
 end

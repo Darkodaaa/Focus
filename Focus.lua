@@ -55,8 +55,11 @@ end
 local function addHologram(packet)
     local ok, err = Check(packet)
     if ok then
-        if Config.Debug then print("DEBUG: Added hologram from: "..packet.id.."distance: "..packet.distance.." coords: "..textutils.serialise(packet.Coords)) end
-        cache[packet.id or math.random(0,5000)] = {properties = packet.hologram.properties,cubes = packet.hologram.cubes,groups = packet.hologram.groups,dist = packet.distance,coords=packet.Coords}
+        if Config.Debug then print("DEBUG: Added hologram from: "..packet.id.." distance: "..packet.distance.." coords: "..textutils.serialise(packet.Coords)) end
+        local entry = packet.hologram
+        entry.dist = packet.distance
+        entry.coords = packet.Coords
+        cache[packet.id or math.random(0,5000)] = entry
     else
         local islogged = false
         for k,v in pairs(logged) do
@@ -87,8 +90,19 @@ local function Render()
         for id,hologram in pairs(cache) do
             if hologram.dist < Config.RenderDist then
                 --Rendering holograms
+                local label = canvas.addFrame({
+                hologram.label.coords.x+hologram.coords.x-x,
+                hologram.label.coords.y+hologram.coords.y-y,
+                hologram.label.coords.z+hologram.coords.z-z})
+                local w,h = label.getSize()
+                label.setPosition(
+                hologram.label.coords.x+hologram.coords.x-x-w/2,
+                hologram.label.coords.y+hologram.coords.y-y-h/2,
+                hologram.label.coords.z+hologram.coords.z-z)
+                label.addText({w/2,h/2},hologram.label.displayText)
+                label.setRotation(hologram.label.rotation.pitch or 0,hologram.label.rotation.yaw or 0, hologram.label.rotation.roll or 0)
                 for k,cube in pairs(hologram.cubes) do
-                    if Config.Debug and false then print("DEBUG: Rendering cube: ",
+                    if Config.Debug then print("DEBUG: Rendering cube: ",
                     (hologram.coords.x-x)+cube.position.x/16,
                     (hologram.coords.y-y)+cube.position.y/16,
                     (hologram.coords.z-z)+cube.position.z/16,
@@ -110,12 +124,11 @@ end
 
 
 local function Main()
-    modem.transmit(holoport, holoport, {protocol="ClientConnect", id = os.getComputerID(), position = {x=x, y=y, z=z}})
+    modem.transmit(holoport, holoport, {Protocol="ClientConnect", id = os.getComputerID(), position = {x=x, y=y, z=z}})
     while true do
         repeat
             event, side, channel, replyChannel, data, distance = os.pullEventRaw()
             if event == "terminate" then
-                print("Terminated")
                 canvas.clear()
                 return nil
             end
