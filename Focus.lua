@@ -22,7 +22,7 @@ local function Check(data)--Checks for malformed data
     if not data then return false, "Missing data." end
     if not data.id then return true, "Id not provided." end
     if not data.hologram then return false, "Hologram missing." end
-    if not data.hologram.properties then return false, "Hologram properties missing." end
+    if not data.hologram.properties then return true, "Hologram properties missing." end
     if not data.hologram.cubes then return false, "Hologram cubes missing." end
     if not data.hologram.groups then return false, "Hologram groups missing." end
     if not data.Protocol then return true, "Protocol not specified." end
